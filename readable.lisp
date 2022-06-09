@@ -129,20 +129,16 @@
       t)))
 
 (defun enable-basic-curly-real ()
-  (in-readtable readable:basic-curly-infix))
-
-					;
-; Should be able to do this without eval-when, look at cmu-infix
-(eval-when (:compile-toplevel :load-toplevel)
-    (defreadtable readable:basic-curly-infix
-	(:merge :standard)
-	; The following install the {...} reader.
-	; See "Common Lisp: The Language" by Guy L. Steele, 2nd edition,
-	; pp. 542-548 and pp. 571-572.
-	; Invoke curly-brace-infix-reader when opening curly brace is read in:
-	(:macro-char #\{ #'curly-brace-infix-reader)
-	; Necessary, else a cuddled closing brace will be part of an atom.
-	(:macro-char #\} (get-macro-character #\) nil))))
+  ; Save old readtable:
+  (when (setup-enable 'basic-curly-infix)
+    ; The following install the {...} reader.
+    ; See "Common Lisp: The Language" by Guy L. Steele, 2nd edition,
+    ; pp. 542-548 and pp. 571-572.
+    ; Invoke curly-brace-infix-reader when opening curly brace is read in:
+    (set-macro-character #\{ #'curly-brace-infix-reader)
+    ; Necessary, else a cuddled closing brace will be part of an atom. ; (
+    (set-macro-character #\} (get-macro-character #\) nil)))
+  (values))
 
 (defun disable-readable ()
   (when *readable-active*
@@ -157,7 +153,7 @@
     (enable-basic-curly-real)
     (read stream)))
 
-;; Print.cl
+;; Print.lisp
 ;;;; Output routines for readable notations.
 ;;;; Use *print-notation* to decide what notation to use when writing,
 ;;;; which may be 'basic-curly-infix, 'full-curly-infix, 'neoteric, or 'sweet.
@@ -212,7 +208,7 @@
 ; Track errors in output-object-readable:
 (defvar *readable-in-print-error* nil)
 
-; WORKAROUND: This was already defined in basic-curly.cl; we redeclare it
+; WORKAROUND: This was already defined in basic-curly.lisp; we redeclare it
 ; here to inhibit compiling warnings.
 (defvar *original-readtable*)
 
@@ -812,7 +808,7 @@
 (defvar *neoteric-underlying-readtable* (copy-readtable)
         "Use this table when reading neoteric atoms")
 
-(defvar neoteric-readtable* (copy-readtable)
+(defvar *neoteric-readtable* (copy-readtable)
         "Use this table when about to read a neoteric expression")
 
 
@@ -1082,21 +1078,41 @@
 
 ;;; Enablers
 
-; Should be able to do this without eval-when, look at cmu-infix
-(defmacro create-readtable ()
- `(defreadtable readable:neoteric
-    (:merge :standard)
-    ; Wrap character pairs.
-    (:macro-char #\{ #'neoteric-curly-brace)
-    (:macro-char #\} (get-macro-character #\)) nil)
-    (:macro-char #\] (get-macro-character #\)) nil)
-    (:macro-char #\[ #'wrap-paren nil)
-    (:macro-char #\( #'wrap-paren nil)
+(defun enable-neoteric-real ()
+  (when (setup-enable 'neoteric)
+    (setq *neoteric-underlying-readtable* (copy-readtable))
+    (set-macro-character #\{ #'neoteric-curly-brace nil
+      *neoteric-underlying-readtable*) ; (
+    (set-macro-character #\} (get-macro-character #\)) nil
+      *neoteric-underlying-readtable*)
+    (unless (get-macro-character #\[ )
+      (set-macro-character #\[ #'wrap-paren nil
+        *neoteric-underlying-readtable*))
+    (unless (get-macro-character #\] ) ; (
+      (set-macro-character #\] (get-macro-character #\) ) nil
+        *neoteric-underlying-readtable*))
+
     ; Wrap all constituents.  Presume ASCII for now.
     ; TODO: Don't wrap if they aren't constituents any more.
-    ; append is used so symbols starting with an escape will work:
-    ,@(mapcar (lambda (x) `(:macro-char ,x #'wrap-read-n-tail nil))
-		(append *constituents* '(#\\ #\| #\")))
+    (dolist (c *constituents*)
+      (set-macro-character c #'wrap-read-n-tail nil))
+
+    ; We need to do this so symbols starting with an escape will work:
+    (set-macro-character #\\ #'wrap-read-n-tail nil)
+    (set-macro-character #\| #'wrap-read-n-tail nil)
+
+    ; This ensures that "hi"(5) => ("hi" 5)
+    (set-macro-character #\" #'wrap-read-n-tail nil)
+
+    ; Wrap character pairs.
+    (set-macro-character #\( #'wrap-paren nil) ; )
+    (set-macro-character #\{ #'neoteric-curly-brace nil) ; (
+    (set-macro-character #\} (get-macro-character #\) ) nil)
+    (unless (get-macro-character #\[ )
+      (set-macro-character #\[ #'wrap-paren nil)) ; (
+    (unless (get-macro-character #\] )
+      (set-macro-character #\] (get-macro-character #\) ) nil))
+
     ; Now deal with dispatch macro char; we'll just deal with default "#".
     ; set-dispatch-macro-character disp-char sub-char function
     ;                              &optional readtable
@@ -1125,43 +1141,44 @@
     ;   #'      = function abbreviation    - Intentionally not wrapped
     ;   #(...)  = vector                   - Intentionally not wrapped
     ;   #*      = bit-vector               - Special-meaning, wrapped
+    (set-dispatch-macro-character #\# #\* #'wrap-dispatch-disabled-tail)
     ;   #,      = (was) load-time eval [Steele] - Intentionally not wrapped
     ;   #0..9   = used for infix arguments - Can't really wrap anyway.
     ;   #:      = uninterned symbol        - Special-meaning, wrapped
+    (set-dispatch-macro-character #\# #\: #'wrap-dispatch-disabled-tail)
     ;   #;      = datum comment (extension)- Intentionally not wrapped
     ;   #=      = label following object   - Intentionally not wrapped
+    ;   #\char  = character object         - Special-meaning, wrapped
+    (set-dispatch-macro-character #\# #\\ #'wrap-dispatch-special-read-tail)
     ;   #|...|# = balanced comment         - Intentionally not wrapped
     ;   #+      = read-time conditional    - Intentionally not wrapped
     ;   #-      = read-time conditional    - Intentionally not wrapped
     ;   #.      = read-time evaluation     - Intentionally not wrapped
     ;   #A,#a   = array                    - Not currently wrapped (debatable).
     ;   #B,#b   = binary rational          - Special-meaning, wrapped
+    (set-dispatch-macro-character #\# #\B #'wrap-dispatch-disabled-tail)
+    (set-dispatch-macro-character #\# #\b #'wrap-dispatch-disabled-tail)
     ;   #C,#c   = complex number           - Not currently wrapped (debatable).
     ;             Complex numbers, because of their format, are tricky to wrap,
     ;             and there's no compelling reason to do so.
     ;   #O,#o   = octal rational           - Special-meaning, wrapped
+    (set-dispatch-macro-character #\# #\O #'wrap-dispatch-disabled-tail)
+    (set-dispatch-macro-character #\# #\o #'wrap-dispatch-disabled-tail)
     ;   #P,#p   = pathname                 - Not wrapped currently (debatable).
     ;             In the future this might be wrapped for #p"hi"(5), but
     ;             it's not obvious it would ever be used that way.
     ;   #R,#r   = radix-n rational         - Special-meaning, wrapped
+    (set-dispatch-macro-character #\# #\R #'wrap-dispatch-disabled-tail)
+    (set-dispatch-macro-character #\# #\r #'wrap-dispatch-disabled-tail)
     ;   #S,#s   = structure                - Not currently wrapped (debatable).
     ;   #X,#x   = hexadecimal rational     - Special-meaning, wrapped
-    (:dispatch-macro-char #\# #\* #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\: #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\B #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\b #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\O #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\o #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\R #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\r #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\X #'wrap-dispatch-disabled-tail)
-    (:dispatch-macro-char #\# #\x #'wrap-dispatch-disabled-tail)
-    ;   #\char  = character object         - Special-meaning, wrapped
-    (:dispatch-macro-char #\# #\\ #'wrap-dispatch-special-read-tail)))
-  
-(create-readtable)
-(defun enable-neoteric-real ()
-  (in-readtable neoteric))
+    (set-dispatch-macro-character #\# #\X #'wrap-dispatch-disabled-tail)
+    (set-dispatch-macro-character #\# #\x #'wrap-dispatch-disabled-tail)
+
+    ; Save in separate variable, so "sweet" can just create its own if needed
+    (setq *neoteric-readtable* *readtable*))
+
+  (values))
 
 
 ; Read until }, then process list as infix list.
@@ -1174,16 +1191,13 @@
            (processed-result (process-curly result)))
       processed-result)))
 
-(defreadtable readable:full-curly-infix
-  (:merge :standard)
-  ; Invoke curly-brace-infix-reader when opening curly brace is read in:
-  (:macro-char #\{ #'full-curly-brace-infix-reader)
-  ; This is necessary, else a cuddled closing brace will be part of an atom:
-  (:macro-char #\} (get-macro-character #\) nil)))
-
 (defun enable-full-curly-infix-real ()
-  (format t "This is actually run~%")
-  (in-readtable full-curly-infix)) 
+  (when (setup-enable 'full-curly-infix)
+    ; Invoke curly-brace-infix-reader when opening curly brace is read in:
+    (set-macro-character #\{ #'full-curly-brace-infix-reader) ; (
+    ; This is necessary, else a cuddled closing brace will be part of an atom:
+    (set-macro-character #\} (get-macro-character #\) nil)))
+  (values)) ; Meaning "Did it"
 
 (defun curly-infix-read (&optional (stream *standard-input*))
   (let ((*readtable* *readtable*) ; Setup to restore on return.
@@ -1497,7 +1511,7 @@
         (t (maptree #'bq-remove-tokens x))))
 
 
-;;; sweet.cl
+;;; sweet.lisp
 ;;; Implements sweet-expressions from the "readable" approach for Lisp.
 
 ;;; Copyright (C) 2007-2014 by David A. Wheeler
@@ -1546,7 +1560,7 @@
 ; Wrapping all character codes up to char-code-limit doesn't really work
 ; correctly.  This is the max char code that will be wrapped by readable's
 ; front readtable.
-(defvar *my-char-code-limit* 255)
+(defvar my-char-code-limit 255)
 
 ; These stubs could be used to attach position info
 (defun attach-sourceinfo (pos value)
@@ -2306,38 +2320,6 @@
       ; Specially handle EOF so the underlying reader will see it.
       (end-of-file () (values)))))
 
-
-
-(eval
-  `(defreadtable readable:sweet-readtable
-     (:case (readtable-case *readtable*))
-     (:syntax-from :standard #\# #\')
-     ,@(loop for ci from 0 upto *my-char-code-limit*
-	     collect `(:macro-char ,(code-char ci) #'t-expr-entry nil))
-     ;(:fuse readable:sweet-underlying-readtable)
-     ))
-
-(defreadtable readable:sweet-underlying-readtable
-    (:merge readable:neoteric)
-    (:fuse readable:sweet-underlying-readtable) ; Could need to fuse sweet-readtable onto sweet-redirect-readtable
-    (:dispatch-macro-char #\# #\| #'wrap-comment-block)
-    (:dispatch-macro-char #\# #\; #'wrap-comment-datum)
-    (:macro-char #\`
-    #'(lambda (stream char)
-	(declare (ignore char))
-	(list 'backquote (my-read-datum stream))))
-    (:macro-char #\`
-    #'(lambda (stream char)
-	(declare (ignore char))
-	(case (my-peek-char stream)
-	    (#\@ (my-read-char stream)
-		(list *comma-atsign* (my-read-datum stream)))
-	    (#\. (read-char stream t nil t)
-		(list *comma-dot* (my-read-datum stream)))
-	    (otherwise (list *comma* (my-read-datum stream)))))))
-
-
-
 ; Set up a readtable that'll redirect any character to t-expr-entry.
 (defun compute-sweet-redirect-readtable ()
   (setq *sweet-readtable*
@@ -2349,15 +2331,14 @@
       ; Copy the readtable-case setting so we will continue to use it.
       (setf (readtable-case new) (readtable-case *readtable*))
       (set-syntax-from-char #\# #\' new) ; force # to not be dispatching char.
-      (loop for ci from 0 upto *my-char-code-limit*
+      (loop for ci from 0 upto my-char-code-limit
          do (set-macro-character (code-char ci) #'t-expr-entry nil new))
       new)))
 
 (defun enable-sweet-real ()
-  ;(in-readtable sweet-readtable)
-  
   (when (setup-enable 'sweet)
     (enable-neoteric-real)
+
     ; Now create the underlying sweet readtable by tweaking neoteric readtable.
     ; This underlying table is called to read specific expressions.
     (setq *readtable* (copy-readtable *readtable*))
@@ -2386,7 +2367,7 @@
     ; which process the indentation, and they'll call other procedures that
     ; in turn will invoke *underlying-sweet-readtable*.
     (compute-sweet-redirect-readtable)
-    (setq *readtable* *sweet-readtable*)) ;|#
+    (setq *readtable* *sweet-readtable*))
   (values))
 
 (defun sweet-read (&optional (stream *standard-input*))
@@ -2395,7 +2376,7 @@
     (enable-sweet-real)
     (read stream)))
 
-;;; enablers.cl
+;;; sweet.lisp
 ;;; Implements sweet-expressions from the "readable" approach for Lisp.
 ; These macros enable various notations.
 ; These are macros so we can force compile-time modification

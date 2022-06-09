@@ -24,7 +24,7 @@
 ; OTHER DEALINGS IN THE SOFTWARE.
 
 
-; Assume ASDL is set up, e.g., by setting environment var CL_SOURCE_REGISTRY
+; Assume ASDF is set up, e.g., by setting environment var CL_SOURCE_REGISTRY
 ; to the name of the directory of the .asd file, followed by "/".
 
 (require "asdf")

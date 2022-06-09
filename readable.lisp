@@ -812,7 +812,7 @@
 (defvar *neoteric-underlying-readtable* (copy-readtable)
         "Use this table when reading neoteric atoms")
 
-(defvar *neoteric-readtable* (copy-readtable)
+(defvar neoteric-readtable* (copy-readtable)
         "Use this table when about to read a neoteric expression")
 
 
@@ -1182,6 +1182,7 @@
   (:macro-char #\} (get-macro-character #\) nil)))
 
 (defun enable-full-curly-infix-real ()
+  (format t "This is actually run~%")
   (in-readtable full-curly-infix)) 
 
 (defun curly-infix-read (&optional (stream *standard-input*))
@@ -2307,9 +2308,18 @@
 
 
 
+(eval
+  `(defreadtable readable:sweet-readtable
+     (:case (readtable-case *readtable*))
+     (:syntax-from :standard #\# #\')
+     ,@(loop for ci from 0 upto *my-char-code-limit*
+	     collect `(:macro-char ,(code-char ci) #'t-expr-entry nil))
+     ;(:fuse readable:sweet-underlying-readtable)
+     ))
+
 (defreadtable readable:sweet-underlying-readtable
     (:merge readable:neoteric)
-    ;(:fuse readable:sweet-redirect-readtable) ; Could need to fuse sweet-readtable onto sweet-redirect-readtable
+    (:fuse readable:sweet-underlying-readtable) ; Could need to fuse sweet-readtable onto sweet-redirect-readtable
     (:dispatch-macro-char #\# #\| #'wrap-comment-block)
     (:dispatch-macro-char #\# #\; #'wrap-comment-datum)
     (:macro-char #\`
@@ -2327,13 +2337,6 @@
 	    (otherwise (list *comma* (my-read-datum stream)))))))
 
 
-(eval
-  `(defreadtable readable:sweet-readtable
-     (:fuse readable:sweet-underlying-readtable)
-     (:case (readtable-case *readtable*))
-     (:syntax-from :standard #\# #\')
-     ,@(loop for ci from 0 upto *my-char-code-limit*
-	     collect `(:macro-char ,(code-char ci) #'t-expr-entry nil))))
 
 ; Set up a readtable that'll redirect any character to t-expr-entry.
 (defun compute-sweet-redirect-readtable ()
@@ -2351,9 +2354,10 @@
       new)))
 
 (defun enable-sweet-real ()
+  ;(in-readtable sweet-readtable)
+  
   (when (setup-enable 'sweet)
     (enable-neoteric-real)
-
     ; Now create the underlying sweet readtable by tweaking neoteric readtable.
     ; This underlying table is called to read specific expressions.
     (setq *readtable* (copy-readtable *readtable*))
@@ -2382,7 +2386,7 @@
     ; which process the indentation, and they'll call other procedures that
     ; in turn will invoke *underlying-sweet-readtable*.
     (compute-sweet-redirect-readtable)
-    (setq *readtable* *sweet-readtable*))
+    (setq *readtable* *sweet-readtable*)) ;|#
   (values))
 
 (defun sweet-read (&optional (stream *standard-input*))

@@ -105,10 +105,11 @@
       (transform-mixed-infix lyst))))
 
 ; Read until }, then process list as infix list.
-(defun curly-brace-infix-reader (stream char)
-  (declare (ignore char))
-  (let ((result (read-delimited-list #\} stream t)))
-    (process-curly result)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun curly-brace-infix-reader (stream char)
+    (declare (ignore char))
+    (let ((result (read-delimited-list #\} stream t)))
+      (process-curly result))))
 
 ; Enable setup to transition into "into":
 ; If we're already in mode "into" return false (nil) and do nothing.
@@ -871,16 +872,17 @@
 ; We should support arbitrary UTF-8 characters, but it can be complicated
 ; to do so portably.  For now, we'll define this as a variable so it
 ; can be overridden.
-(defvar *constituents*
-    '(#\! #\$ #\% #\& #\* #\+ #\- #\. #\/
-      #\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9
-      #\: #\< #\= #\> #\? #\@
-      #\A #\B #\C #\D #\E #\F #\G #\H #\I #\J #\K #\L #\M
-      #\N #\O #\P #\Q #\R #\S #\T #\U #\V #\W #\X #\Y #\Z
-      #\^ #\_
-      #\a #\b #\c #\d #\e #\f #\g #\h #\i #\j #\k #\l #\m
-      #\n #\o #\p #\q #\r #\s #\t #\u #\v #\w #\x #\y #\z #\~
-      #\rubout )) ; Rubout, really?!?  Yup, it's in the spec.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+    (defvar *constituents*
+	'(#\! #\$ #\% #\& #\* #\+ #\- #\. #\/
+	#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9
+	#\: #\< #\= #\> #\? #\@
+	#\A #\B #\C #\D #\E #\F #\G #\H #\I #\J #\K #\L #\M
+	#\N #\O #\P #\Q #\R #\S #\T #\U #\V #\W #\X #\Y #\Z
+	#\^ #\_
+	#\a #\b #\c #\d #\e #\f #\g #\h #\i #\j #\k #\l #\m
+	#\n #\o #\p #\q #\r #\s #\t #\u #\v #\w #\x #\y #\z #\~
+	#\rubout ))) ; Rubout, really?!?  Yup, it's in the spec.
 
 ; TODO: Add UTF-8 constituents to *constituents* if the underlying
 ; system supports them in the readtable.

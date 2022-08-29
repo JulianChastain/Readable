@@ -32,7 +32,7 @@
 
 (defpackage #:readable
   #+clisp (:modern t)
-  (:use :cl)
+  (:use :cl :named-readtables)
   (:export #:enable-basic-curly #:basic-curly-read
            #:enable-full-curly-infix #:enable-curly-infix 
            #:curly-infix-read
@@ -54,8 +54,12 @@
            #:princ-to-string-readable
            #:stringify-object-readable
            #:output-object-readable
-           
-           ))
+           #:neoteric
+	   #:basic-curly-infix
+	   #:full-curly-infix
+	   #:sweet-underlying-readtable
+	   #:sweet-readtable
+	   ))
 
 (in-package #:readable-asd)
 
@@ -70,5 +74,6 @@
   ; :serial t ;; the dependencies are (no longer) linear.
   :components
     ((:file "readable")))
+
 
 

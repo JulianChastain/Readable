@@ -213,10 +213,6 @@
 ; Track errors in output-object-readable:
 (defvar *readable-in-print-error* nil)
 
-; WORKAROUND: This was already defined in basic-curly.cl; we redeclare it
-; here to inhibit compiling warnings.
-(defvar *original-readtable*)
-
 ; TODO: Determine output stream.  Just return stream provided for now.
 (defun out-synonym-of (stream)
   stream)

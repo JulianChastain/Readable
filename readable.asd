@@ -34,7 +34,7 @@
   #+clisp (:modern t)
   (:use :cl :named-readtables)
   (:export #:enable-basic-curly #:basic-curly-read
-           #:enable-full-curly-infix #:enable-curly-infix 
+           #:enable-curly-infix 
            #:curly-infix-read
            #:enable-neoteric #:neoteric-read
            #:enable-sweet #:sweet-read

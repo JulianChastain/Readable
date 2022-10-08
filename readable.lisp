@@ -50,6 +50,7 @@
 ;   {{- x} / 2}   => {(- x) / 2}   => (/ (- x) 2)
 
 (cl:in-package :readable)
+(proclaim '(optimize (debug 3)))
 
 (defvar *original-readtable* (copy-readtable) "Saved readtable")
 (defvar *readable-active* nil "Value of active readable notation for reading")
@@ -130,7 +131,8 @@
       t)))
 
 (defun enable-basic-curly-real ()
-  (in-readtable readable:basic-curly-infix))
+  (when (setup-enable 'basic-curly-infix)
+    (in-readtable readable:basic-curly-infix)))
 
 					;
 ; Should be able to do this without eval-when, look at cmu-infix
@@ -809,7 +811,7 @@
 (defvar *neoteric-underlying-readtable* (copy-readtable)
         "Use this table when reading neoteric atoms")
 
-(defvar neoteric-readtable* (copy-readtable)
+(defvar *neoteric-readtable* (copy-readtable)
         "Use this table when about to read a neoteric expression")
 
 
@@ -1159,7 +1161,19 @@
   
 (create-readtable)
 (defun enable-neoteric-real ()
-  (in-readtable neoteric))
+  (when (setup-enable 'neoteric)
+    (setq *neoteric-underlying-readtable* (copy-readtable))
+    (set-macro-character #\{ #'neoteric-curly-brace nil
+	*neoteric-underlying-readtable*) ; (
+    (set-macro-character #\} (get-macro-character #\)) nil
+	*neoteric-underlying-readtable*)
+    (unless (get-macro-character #\[ )
+	(set-macro-character #\[ #'wrap-paren nil
+	*neoteric-underlying-readtable*))
+    (unless (get-macro-character #\] ) ; (
+	(set-macro-character #\] (get-macro-character #\) ) nil
+	*neoteric-underlying-readtable*))
+  (in-readtable neoteric)))
 
 
 ; Read until }, then process list as infix list.
@@ -2345,9 +2359,11 @@
     (let ((new (copy-readtable nil)))
       ; Copy the readtable-case setting so we will continue to use it.
       (setf (readtable-case new) (readtable-case *readtable*))
-      (set-syntax-from-char #\# #\' new) ; force # to not be dispatching char.
+      ;(set-syntax-from-char #\# #\' new) ; FIX: force # to not be dispatching char.
       (loop for ci from 0 upto *my-char-code-limit*
          do (set-macro-character (code-char ci) #'t-expr-entry nil new))
+      ; FIX: ERROR #\# is not a dispatching macro char
+      ; The error persists regardless of whether the above line is commented
       new)))
 
 (defun enable-sweet-real ()
@@ -2382,7 +2398,7 @@
     ; will be redirected (through this table) eventually to t-expr and it-expr,
     ; which process the indentation, and they'll call other procedures that
     ; in turn will invoke *underlying-sweet-readtable*.
-    (compute-sweet-redirect-readtable)
+    (step (compute-sweet-redirect-readtable))
     (setq *readtable* *sweet-readtable*)) ;|#
   (values))
 
@@ -2401,16 +2417,14 @@
 
 (defmacro enable-basic-curly ()
   (eval-when (:compile-toplevel :load-toplevel :execute)
+    (when (setup-enable 'basic-curly-infix))
       (enable-basic-curly-real)))
-
-(defmacro enable-full-curly-infix ()
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-      (enable-full-curly-infix-real)))
 
 ; Synonym.
 (defmacro enable-curly-infix ()
   (eval-when (:compile-toplevel :load-toplevel :execute)
-      (enable-full-curly-infix-real)))
+    (when (setup-enable 'full-curly-infix)
+      (enable-full-curly-infix-real))))
 
 (defmacro enable-neoteric ()
   (eval-when (:compile-toplevel :load-toplevel :execute)

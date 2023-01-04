@@ -30,7 +30,7 @@
 (require "asdf")
 (setf (readtable-case *readtable*) :invert)
 (asdf:load-system :readable)
-(in-package :readable)
+(use-package :readable)
 
 (defun mytest (input correct)
   (cond
@@ -446,5 +446,5 @@ mytest
 (disable-readable)
 (princ "Tests complete!")
 (terpri)
-
+(my-quit 0)
 

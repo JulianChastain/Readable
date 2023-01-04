@@ -59,9 +59,9 @@
 	   #:full-curly-infix
 	   #:sweet-underlying-readtable
 	   #:sweet-readtable
-	   )
+	   ))
 
-  (in-package #:readable-asd))
+(in-package #:readable-asd)
 
 (defsystem readable
   :name "readable"

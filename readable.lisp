@@ -130,7 +130,8 @@
       t)))
 
 (defun enable-basic-curly-real ()
-  (in-readtable readable:basic-curly-infix))
+  (when (setup-enable 'basic-curly-infix)
+    (in-readtable readable:basic-curly-infix)))
 
 					;
 ; Should be able to do this without eval-when, look at cmu-infix
@@ -1159,7 +1160,19 @@
   
 (create-readtable)
 (defun enable-neoteric-real ()
-  (in-readtable neoteric))
+  (when (setup-enable 'neoteric)
+    (setq *neoteric-underlying-readtable* (copy-readtable))
+    (set-macro-character #\{ #'neoteric-curly-brace nil
+	*neoteric-underlying-readtable*) ; (
+    (set-macro-character #\} (get-macro-character #\)) nil
+	*neoteric-underlying-readtable*)
+    (unless (get-macro-character #\[ )
+	(set-macro-character #\[ #'wrap-paren nil
+	*neoteric-underlying-readtable*))
+    (unless (get-macro-character #\] ) ; (
+	(set-macro-character #\] (get-macro-character #\) ) nil
+	*neoteric-underlying-readtable*))
+  (in-readtable neoteric)))
 
 
 ; Read until }, then process list as infix list.
@@ -2401,16 +2414,14 @@
 
 (defmacro enable-basic-curly ()
   (eval-when (:compile-toplevel :load-toplevel :execute)
+    (when (setup-enable 'basic-curly-infix))
       (enable-basic-curly-real)))
-
-(defmacro enable-full-curly-infix ()
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-      (enable-full-curly-infix-real)))
 
 ; Synonym.
 (defmacro enable-curly-infix ()
   (eval-when (:compile-toplevel :load-toplevel :execute)
-      (enable-full-curly-infix-real)))
+    (when (setup-enable 'full-curly-infix)
+      (enable-full-curly-infix-real))))
 
 (defmacro enable-neoteric ()
   (eval-when (:compile-toplevel :load-toplevel :execute)

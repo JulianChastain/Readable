@@ -30,34 +30,7 @@
 (require "asdf")
 (setf (readtable-case *readtable*) :invert)
 (asdf:load-system :readable)
-(use-package :readable)
-
-
-; From http://www.cliki.net/Portable%20Exit
-; (defun my-quit (&optional code)
-  ;; This group from "clocc-port/ext.lisp"
-					;#+allegro (excl:exit code)
-					;#+clisp (#+lisp=cl ext:quit #-lisp=cl lisp:quit code)
-					;#+cmu (ext:quit code)
-					;#+cormanlisp (win32:exitprocess code)
-					;#+gcl (lisp:bye code)                     ; XXX Or is it LISP::QUIT?
-					;#+lispworks (lw:quit :status code)
-					;#+lucid (lcl:quit code)
-					; #+sbcl (sb-ext:quit
-					;         :unix-code (typecase code (number code) (null 0) (t 1)))
-  ;#+sbcl (sb-ext:exit :code code)
-  ;; This group from Maxima
-					;#+kcl (lisp::bye)                         ; XXX Does this take an arg?
-					;#+scl (ext:quit code)                     ; XXX Pretty sure this *does*.
-					;#+(or openmcl mcl) (ccl::quit)
-					;#+abcl (cl-user::quit)
-					;#+ecl (si:quit)
-  ;; This group from <hebi...@math.uni.wroc.pl>
-					;#+poplog (poplog::bye)                    ; XXX Does this take an arg?
-  ;#- (or allegro clisp cmu cormanlisp gcl lispworks lucid sbcl kcl scl openmcl mcl abcl ecl)
-;(error 'not-implemented :proc (list 'quit code)))
-(defun my-quit (&optional code)
-  (sb-ext:exit :code code))
+(in-package :readable)
 
 (defun mytest (input correct)
   (cond
@@ -69,7 +42,7 @@
       (princ "FAIL!!!")
       (print input)
       (print correct)
-      (my-quit 1))))
+      (sb-ext:exit :code 1))))
 
 ; Special test values:
 (defvar fab '(f a b))
@@ -82,7 +55,7 @@
 
 
 
-(enable-full-curly-infix)
+(enable-curly-infix)
 
 (mytest '{cos(x) + sin(x)} '(+ (cos x) (sin x)))
 (mytest '{fibup(n 0 1)} '(fibup n 0 1))
@@ -473,5 +446,5 @@ mytest
 (disable-readable)
 (princ "Tests complete!")
 (terpri)
-(my-quit 0)
+
 
